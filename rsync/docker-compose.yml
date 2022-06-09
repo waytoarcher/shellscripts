@@ -1,0 +1,8 @@
+rsyncd:
+  image: vimagick/rsyncd
+  ports:
+    - "873:873"
+  volumes:
+#   - ./rsyncd.conf:/etc/rsyncd.conf
+    - /opt/halium_build:/share
+  restart: always
