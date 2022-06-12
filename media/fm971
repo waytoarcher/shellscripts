@@ -1,0 +1,10 @@
+#!/bin/bash
+#by sandylaw <waytoarcher@gmail.com> 2020-11-14
+
+if mpv &> /dev/null; then
+    echo "Enjoy FM 97.1"
+    mpv http://fm971.cityfm.tw:8080/971.mp3
+else
+    echo "Please install mpv first."
+    exit 1
+fi

@@ -1,0 +1,147 @@
+#!/bin/bash
+#
+# Copyright (C) 2021 Deepin Technology Co., Ltd.
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#
+#Name       :   x11vnc-tool
+#Desciption :   x11vnc server and client setup tool.
+#Time       :   2021-05-28
+#Author     :   user
+#Connect    :   user@uniontech.com
+out() { printf "%s %s\n%s\n" "$1" "$2" "${@:3}"; }
+error() { out "==> ERROR:" "$@"; } >&2
+warning() { out "==> WARNING:" "$@"; } >&2
+msg() { out "==>" "$@"; }
+
+if [ "$(id -u)" -eq 0 ]; then
+    error "Please run $0 with non-root."
+    exit 1
+fi
+function help() {
+    msg "bash $0"
+    exit 0
+}
+case $1 in
+    -h | --help | -H | --HELP)
+        help
+        ;;
+    *) ;;
+
+esac
+if [ "x86_64" == "$(arch)" ]; then
+    ARCH=amd64
+elif [ "aarch64" == "$(arch)" ]; then
+    ARCH=arm64
+else
+    echo "$ARCH"
+    echo "Just support amd64 or arm64."
+    exit 1
+fi
+
+function start_x11vncserver() {
+    sport=5900
+    sudo systemctl stop x11vnc
+    if pgrep "[x]11vnc"; then sudo killall x11vnc > /dev/null 2>&1; fi
+    sudo systemctl restart x11vnc
+    sudo systemctl status x11vnc
+}
+function install_x11vncserver() {
+    user="${USER}"
+    sport=5900
+    msg "INFO installing vnc server: x11vnc"
+    sudo apt install -y x11vnc
+    rm -rf "$HOME"/.vnc
+    if pgrep "[x]11vnc"; then sudo killall x11vnc > /dev/null 2>&1; fi
+    x11vnc -storepasswd
+    cat << EOF | sudo tee /etc/systemd/system/x11vnc.service
+[Unit]
+Description=Start x11vnc at startup.
+After=multi-user.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/x11vnc -auth guess -forever -loop -noxdamage -repeat -rfbauth /home/${user}/.vnc/passwd -rfbport ${sport} -shared -capslock -nomodtweak -o /var/log/x11vnc.log -bg
+
+[Install]
+WantedBy=multi-user.target
+
+EOF
+    sudo systemctl daemon-reload
+    sudo systemctl enable --now x11vnc.service
+    systemctl status x11vnc
+
+}
+function install_x11vncserver_ssl() {
+    user="${USER}"
+    sport=5943
+    msg "INFO installing vnc server: x11vnc"
+    sudo apt install -y x11vnc
+    mkdir -p /home/"${user}"/.vnc
+    if pgrep "[x]11vnc"; then sudo killall x11vnc > /dev/null 2>&1; fi
+    x11vnc -storepasswd /home/"${user}"/.vnc/passwdssl
+    cat << EOF | sudo tee /etc/systemd/system/x11vncssl.service
+[Unit]
+Description=Start x11vnc at startup.
+After=multi-user.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/x11vnc -auth guess -forever -loop -noxdamage -repeat -rfbauth /home/${user}/.vnc/passwdssl -rfbport ${sport} -shared -capslock -nomodtweak -o /var/log/x11vnc.log -ssl -sslonly -bg
+
+[Install]
+WantedBy=multi-user.target
+
+EOF
+    sudo systemctl daemon-reload
+    sudo systemctl enable --now x11vncssl.service
+    systemctl status x11vncssl
+}
+function install_vncviewer() {
+    sudo apt install -y remmina ssvnc
+
+}
+
+function main() {
+    while true; do
+        echo ""
+        echo " x11vnc and remmina:"
+        echo " 1: Install vnc server: x11vnc default port 5900"
+        echo " 2: Install vnc server: x11vnc with ssl default port 5943"
+        echo " 3: Install vnc client: remmina ssvnc"
+        echo " 0: Exit"
+        echo ""
+
+        read -r -p "Please input the choice:" idx
+        if [[ "$idx" -ge 0 ]] || [[ "$idx" -le 3 ]]; then
+            :
+        else
+            echo "Please check the your choice."
+            exit 1
+        fi
+        if [[ '1' = "$idx" ]]; then
+            eval "install_x11vncserver"
+        elif [[ '2' = "$idx" ]]; then
+            eval "install_x11vncserver_ssl"
+        elif [[ '3' = "$idx" ]]; then
+            eval "install_vncviewer"
+        elif [[ '0' = "$idx" ]]; then
+            eval "exit 0"
+        else
+            echo "no choice,exit!"
+            eval "exit 0"
+        fi
+    done
+}
+main

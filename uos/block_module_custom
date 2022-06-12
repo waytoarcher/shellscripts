@@ -1,0 +1,78 @@
+#!/bin/bash
+#
+# Copyright (C) 2021 Deepin Technology Co., Ltd.
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#
+#Name       :   block_module_custom
+#Desciption :   屏蔽指定内核模块
+#Time       :   2021-05-18
+#Author     :   user
+#Connect    :   user@uniontech.com
+if ! [ "$(id -u)" -eq 0 ]; then
+    echo "Please run $0 with root."
+    exit 0
+fi
+out() { printf "%s %s\n%s\n" "$1" "$2" "${@:3}"; }
+error() { out "==> ERROR:" "$@"; } >&2
+warning() { out "==> WARNING:" "$@"; } >&2
+msg() { out "==>" "$@"; }
+function help() {
+    msg "bash $0 [\$module_block=true/false]"
+    msg "\$module:"
+    msg "   usb_storages    #USB存储"
+    msg "   cdroms          #光驱"
+    msg "   radios          #wifi/蓝牙/wwan"
+    msg "   multitouchs     #多点触控"
+    msg "   gestures        #触控手势"
+    exit 0
+}
+case $1 in
+    -h | --help | -H | --HELP | help | h | H | HELP)
+        help
+        ;;
+    *) ;;
+esac
+export $@ > /dev/null 2>&1
+usb_storages=(usb-storage rndis) #usb存储相关模块
+cdroms=(cdrom ide-cd sr_mod pktcdvd udf iso9660 joliet) #光驱相关模块
+radios=(bluetooth wwan 80211 wimax usbnet cdc_ether) #无线相关模块
+multitouchs=(hid-multitouch) #多点触控相关模块
+gestures=(evdev mtdev) #触控手势相关模块
+usb_storages_block=${usb_storages_block:-true}
+cdroms_block=${cdroms_block:-false}
+radios_block=${radios_block:-true}
+multitouchs_block=${multitouchs_block:-false}
+gestures_block=${gestures_block:-true}
+blocklist="/etc/modprobe.d/blocklist.conf"
+true > "${blocklist}"
+
+function block_driver() {
+    modules=$1
+    for module_name in ${modules[*]}; do
+        read -ra drivers <<< "$(find /lib/modules/*/kernel/ \( -name "*${module_name}*.ko" \) -print0 | xargs -0 -L1 -I{} basename "{}" .ko | sort -u | tr "\n" " ")"
+        for driver in ${drivers[*]}; do
+            cat >> "${blocklist}" << EOF
+install ${driver} /bin/true
+EOF
+        done
+    done
+}
+${usb_storages_block} && block_driver "${usb_storages[*]}" || true
+${cdroms_block} && block_driver "${cdroms[*]}" || true
+${radios_block} && block_driver "${radios[*]}" || true
+${multitouchs_block} && block_driver "${multitouchs[*]}" || true
+${gestures_block} && block_driver "${gestures[*]}" || true
+cat "$blocklist"
+msg "Please reboot the system for the configuration to take effect."

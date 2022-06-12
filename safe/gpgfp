@@ -1,0 +1,22 @@
+#!/bin/bash
+file=${1}
+if ! [ -e "${file}" ]; then
+    exit 1
+fi
+
+function gpg_file_passwd() {
+    file=${1}
+    if ! [ -e "${file}" ]; then
+        exit 1
+    fi
+    password=$(python -m passgen -n 1 -p -l 12)
+    printf "$password" | gpg --batch --no-tty --yes --passphrase-fd 0 -o "${file}".gpg -c "${file}"
+    echo "${file}        ${password}" >> "$HOME"/.filepasswd
+}
+if python -m passgen -n 1 &> /dev/null; then
+    gpg_file_passwd "${file}"
+else
+    pip3 install passwd
+    sleep 1
+    gpg_file_passwd "${file}"
+fi

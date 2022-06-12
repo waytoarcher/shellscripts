@@ -1,0 +1,1 @@
+sudo /usr/sbin/logwatch --output stdout --format text --range yesterday --service all

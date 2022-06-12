@@ -1,0 +1,134 @@
+snippet author "paste my name and email"
+#!/usr/bin/env bash
+# By Sandylaw <waytoarcher@gmail.com>
+# `!v strftime('%a, %d %b %Y %X %z')`
+set -euo pipefail
+endsnippet
+snippet license "Paste uos license"
+#! /bin/bash
+#
+# Copyright (C) 2020 Deepin Technology Co., Ltd.
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#
+#Name       :   
+#Desciption :   
+#Time       :   `!v strftime("%Y-%m-%dT%H:%M:%S")`
+#Author     :   user
+#Connect    :   user@uniontech.com
+set -euo pipefail
+IFS=$'\n\t'
+`!p snip.rv ='\n\n' `
+endsnippet
+snippet imgbase64 "turn img to base64"
+function imgbase64(){
+local file=${1}
+cat << EOF|tee /tmp/image.md
+![image][imagebase64]
+[imagebase64]:data:image/jpg;base64,$(base64 -w 0 "${file}")
+EOF
+}
+endsnippet
+snippet trip "trip same row or word"
+# 去重复行，只保留一行相同内容
+function trip() {
+    keyword=$1
+    file=$2
+    keyword_wc=$(grep -rn "$keyword" "$file" | wc -l)
+    while true; do
+        if [ "$keyword_wc" -gt 1 ]; then
+            sed -ri "0,/$keyword/{//d;}" "$file" &> /dev/null
+            keyword_wc=$((keyword_wc - 1))
+        else
+            break
+        fi
+    done
+}
+#去重复关键字，只保留一个相同关键字
+function wtrip() {
+    keyword=$1
+    file=$2
+    keyword_wc=$(grep -rn "$keyword" "$file" | wc -w)
+    while true; do
+        if [ "$keyword_wc" -gt 1 ]; then
+            sed -ri "0,/$keyword/s///" "$file" &> /dev/null
+            keyword_wc=$((keyword_wc - 1))
+        else
+            break
+        fi
+    done
+}
+endsnippet
+
+
+snippet common "some common function"
+out() { printf "%s %s\n%s\n" "$1" "$2" "${@:3}"; }
+error() { out "==> ERROR:" "$@"; } >&2
+warning() { out "==> WARNING:" "$@"; } >&2
+msg() { out "==>" "$@"; }
+msg2() { out "  ->" "$@"; }
+die() {
+	error "$@"
+	exit 1
+}
+
+get_timer() {
+	date +%s
+}
+
+# $1: start timer
+elapsed_time() {
+	echo "$1" "$(get_timer)" | awk '{ printf "%0.2f",($2-$1)/60 }'
+}
+
+show_elapsed_time() {
+	msg "Time %s: %s minutes..." "$1" "$(elapsed_time "$2")"
+}
+
+ignore_error() {
+	"$@" 2>/dev/null
+	return 0
+}
+endsnippet
+
+snippet latest "get latest release form github"
+function get_latest_release() {
+    curl --silent "https://api.github.com/repos/$1/releases/latest" | grep -Po '"tag_name":[ ]*"\K.*?(?=")'
+}
+endsnippet
+
+
+snippet package "package installer"
+function package() {
+	packages=("$@")
+	apt=$(command -v apt-get)
+	yum=$(command -v yum)
+	yay=$(command -v yay)
+	if [ -z "$yay" ]; then
+		pacman=$(command -v pacman)
+	fi
+	if [ -n "$apt" ]; then
+		sudo apt-get update
+		sudo apt-get -y install "${packages[@]}"
+	elif [ -n "$yum" ]; then
+		sudo yum -y install "${packages[@]}"
+	elif [ -n "$yay" ]; then
+		yay -S "${packages[@]}"
+	elif [ -n "$pacman" ]; then
+		sudo pacman -S "${packages[@]}"
+	else
+		echo "Err: no path to apt-get or yum" >&2
+	fi
+}
+endsnippet

@@ -1,0 +1,10 @@
+#!/bin/bash
+#by sandylaw <waytoarcher@gmail.com> 2020-11-14
+
+if mpv &> /dev/null; then
+    echo "Enjoy Billboard Radio China - 80/90后 - Hong Kong"
+    mpv http://streema.com/radios/play/HKGFM.net_Classics_Rewind_Hong_Kong_FM_Classics
+else
+    echo "Please install mpv first."
+    exit 1
+fi

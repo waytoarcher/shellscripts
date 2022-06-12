@@ -1,0 +1,279 @@
+#!/bin/bash
+# v1.0 by waytoarcher <waytoarcher@gmail.com>
+# 2020-10-10
+check_install() {
+    if ! [ -f /etc/audit/audit.rules ]; then
+        echo "Please check and config /etc/audit/audit.rules"
+        exit 0
+    fi
+    if [ -f  /usr/sbin/auditd ]; then
+        #    sudo cp ./audit.rules  /etc/audit/rules.d/audit.rules
+        #    sudo systemctl restart auditd.service
+        : &> /dev/null
+    else
+        echo "Please install auditd first."
+        sudo apt-get install -y auditd
+    fi
+}
+read_time() {
+    times=(now recent boot today yesterday this-week week-ago this-month this-year)
+    time_num=${#times[*]}
+    echo "${times[*]}" | tr " " "\n" | cat -n
+    read -rp "Please select the start time id:" time_id
+    if [[ "${time_id}" -gt "${time_num}" ]]; then
+        echo "Please check the start time id."
+        exit 0
+    fi
+}
+login_report() {
+    #用户登录事件生成的报告
+    read_time
+    sudo aureport -ts "${times[$time_id - 1]}" -i -l | less
+}
+pid_report() {
+    #对于进程所有event的信息
+    read_time
+    sudo aureport -ts "${times[$time_id - 1]}" -i -p | less
+}
+user_report() {
+    #对于用户在系统运行命令的生成的报告
+    read_time
+    sudo aureport -ts "${times[$time_id - 1]}" -i -u | less
+}
+user_summary_report() {
+    #对用户的event进行总体统计
+    read_time
+    sudo aureport -ts "${times[$time_id - 1]}" -i -u --summary | less
+}
+system_call_report() {
+    #system call的报告
+    read_time
+    sudo aureport -ts "${times[$time_id - 1]}" -i -s | less
+}
+system_call_summary_report() {
+    #system call的报告
+    read_time
+    sudo aureport -ts "${times[$time_id - 1]}" -i -s --summary | less
+}
+exec_report() {
+    #从可执行的角度去查看audit log
+    read_time
+    sudo aureport -ts "${times[$time_id - 1]}" -i -x | less
+}
+exec_summary_report() {
+    #从可执行的角度去查看audit log
+    read_time
+    sudo aureport -ts "${times[$time_id - 1]}" -i -x --summary | less
+}
+event_report() {
+    #分类统计事件数量
+    read_time
+    sudo aureport -ts "${times[$time_id - 1]}" -i -e | less
+}
+event_summary_report() {
+    #分类统计事件数量
+    read_time
+    sudo aureport -ts "${times[$time_id - 1]}" -i -e --summary | less
+}
+file_report() {
+    #生成一个文件相关event的日志报告
+    read_time
+    sudo aureport -ts "${times[$time_id - 1]}" -i -f | less
+}
+file_summary_report() {
+    #生成一个文件相关event的日志报告
+    read_time
+    sudo aureport -ts "${times[$time_id - 1]}" -i -f --summary | less
+}
+log_time_range() {
+    sudo aureport -t | less
+}
+list_rules() {
+    sudo auditctl -l | less
+}
+list_rules_key() {
+    read -ra rules <<< "$(sudo cat /etc/audit/audit.rules | grep '\-k' | awk -F '-k' '{print $2}' | sort -u | tr "\n" " ")"
+
+    rule_num=${#rules[*]}
+    if [[ $rule_num -lt 1 ]]; then
+        echo "No auditd rule."
+        exit 0
+    fi
+    sudo cat /etc/audit/audit.rules | grep '\-k' | awk -F '-k' '{print $2}' | sort -u | cat -n
+}
+
+ausearch_rule() {
+    list_rules_key
+    read -rp "Please input the rule id:" rule_id
+
+    if [[ "${rule_id}" -gt "${rule_num}" ]]; then
+        echo "Please check the rule id."
+        exit 0
+    fi
+    read_time
+    sudo ausearch -ts "${times[$time_id - 1]}" -i -k "${rules[$rule_id - 1]}" | less
+}
+
+config_auditd_logs() {
+    sudo cat /etc/audit/auditd.conf | grep -e max_log_file -e num_logs
+    read -rp "Do you want modify the max size of auditd log file? yes or no :" modify
+    case ${modify} in
+        yes | y | Y | YES)
+            read -rp "Please input the max size of auditd log file(5-20)Mib: " log_size
+            if  [[ "$log_size" -ge 5 ]] || [[ "$log_size" -le 20 ]]; then
+                sudo sed -ri "/max_log_file =/cmax_log_file = $log_size" /etc/audit/auditd.conf &> /dev/null
+                sudo cat /etc/audit/auditd.conf | grep "max_log_file ="
+                sudo systemctl restart auditd.service
+            else
+                echo "Please check your input."
+            fi
+            ;;
+
+        *) ;;
+
+    esac
+    echo ""
+    read -rp "Do you want modify auditd logs num? yes or no :" modify
+    case ${modify} in
+        yes | y | Y | YES)
+            read -rp "Please input the num of auditd logs(5-100): " log_num
+            if  [[ "$log_num" -ge 5 ]] || [[ "$log_num" -le 100 ]]; then
+                sudo sed -ri "/num_logs/cnum_logs = $log_num" /etc/audit/auditd.conf &> /dev/null
+                sudo cat /etc/audit/auditd.conf | grep num_logs
+                sudo systemctl restart auditd.service
+            else
+                echo "Please check your input."
+            fi
+            ;;
+
+        *) ;;
+
+    esac
+
+}
+
+report() {
+    while true; do
+        echo ""
+        echo "Auditd Report, Please select:"
+        echo " 1:  login_report"
+        echo " 2:  pid_report"
+        echo " 3:  user_report"
+        echo " 4:  system_call_report"
+        echo " 5:  exec_report"
+        echo " 6:  event_report"
+        echo " 7:  file_report"
+        echo " 8:  exit"
+        echo ""
+
+        read -r -p "Please input the choice:" rdx
+        if [[ "$rdx" -ge 1 ]] || [[ "$rdx" -le 8 ]]; then
+            :
+        else
+            echo "Please check the your choice."
+        fi
+
+        if [[ '1' = "$rdx" ]]; then
+            eval "login_report"
+        elif [[ '2' = "$rdx" ]]; then
+            eval "pid_report"
+        elif [[ '3' = "$rdx" ]]; then
+            eval "user_report"
+        elif [[ '4' = "$rdx" ]]; then
+            eval "system_call_report"
+        elif [[ '5' = "$rdx" ]]; then
+            eval "exec_report"
+        elif [[ '6' = "$rdx" ]]; then
+            eval "event_report"
+        elif [[ '7' = "$rdx" ]]; then
+            eval "file_report"
+        elif [[ '8' = "$rdx" ]]; then
+            eval "main"
+        else
+            echo "no choice,exit!"
+            eval "main"
+        fi
+    done
+}
+summary_report() {
+    while true; do
+        echo ""
+        echo "Auditd Summary Report, Please select:"
+        echo " 1:  user_summary_report"
+        echo " 2:  system_call_summary_report"
+        echo " 3:  exec_summary_report"
+        echo " 4:  event_summary_report"
+        echo " 5:  file_summary_report"
+        echo " 6:  exit"
+        echo ""
+
+        read -r -p "Please input the choice:" sdx
+        if [[ "$sdx" -ge 1 ]] || [[ "$sdx" -le 6 ]]; then
+            :
+        else
+            echo "Please check the your choice."
+        fi
+
+        if [[ '1' = "$sdx" ]]; then
+            eval "user_summary_report"
+        elif [[ '2' = "$sdx" ]]; then
+            eval "system_call_summary_report"
+        elif [[ '3' = "$sdx" ]]; then
+            eval "exec_summary_report"
+        elif [[ '4' = "$sdx" ]]; then
+            eval "event_summary_report"
+        elif [[ '5' = "$sdx" ]]; then
+            eval "file_summary_report"
+        elif [[ '6' = "$sdx" ]]; then
+            eval "main"
+        else
+            echo "no choice,exit!"
+            eval "main"
+        fi
+    done
+}
+main() {
+    while true; do
+        echo ""
+        echo "Auditd Manager"
+        echo " 1:  List rules"
+        echo " 2:  List the key of rules"
+        echo " 3:  ausearch rule"
+        echo " 4:  audit_log_time_range"
+        echo " 5:  report"
+        echo " 6:  summary_report"
+        echo " 7:  config_autitd_logs"
+        echo " 8:  exit"
+        echo ""
+
+        read -r -p "Please input the choice:" idx
+        if [[ "$idx" -ge 1 ]] || [[ "$idx" -le 7 ]]; then
+            :
+        else
+            echo "Please check the your choice."
+        fi
+
+        if [[ '1' = "$idx" ]]; then
+            eval "list_rules"
+        elif [[ '2' = "$idx" ]]; then
+            eval "list_rules_key"
+        elif [[ '3' = "$idx" ]]; then
+            eval "ausearch_rule"
+        elif [[ '4' = "$idx" ]]; then
+            eval "log_time_range"
+        elif [[ '5' = "$idx" ]]; then
+            eval "report"
+        elif [[ '6' = "$idx" ]]; then
+            eval "summary_report"
+        elif [[ '7' = "$idx" ]]; then
+            eval "config_auditd_logs"
+        elif [[ '8' = "$idx" ]]; then
+            eval "exit 0"
+        else
+            echo "no choice,exit!"
+            eval "exit 0"
+        fi
+    done
+}
+check_install
+main

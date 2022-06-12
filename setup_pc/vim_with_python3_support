@@ -1,0 +1,23 @@
+#!/bin/bash
+sudo apt install -y libncurses-dev
+cd /var/tmp/ || exit 1
+proxychains git clone https://github.com/vim/vim.git || exit 1
+
+cd vim || exit 1
+export LDFLAGS="-fno-lto"
+./configure --with-features=huge \
+            --enable-multibyte \
+            --enable-rubyinterp=yes \
+            --enable-python3interp=yes \
+            --with-python3-config-dir=$(python3-config --configdir) \
+            --enable-perlinterp=yes \
+            --enable-luainterp=yes \
+            --enable-gui=gtk2 \
+            --enable-cscope \
+            --prefix=/usr/local
+
+make VIMRUNTIMEDIR=/usr/local/share/vim/vim82
+
+sudo make install
+sudo ln -sf /usr/local/bin/vim /bin/vi
+sudo ln -sf /usr/local/bin/vim /usr/bin/vim

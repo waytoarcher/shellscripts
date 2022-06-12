@@ -1,0 +1,110 @@
+{
+    "log": {
+        "loglevel": "warning"
+    },
+    "inbound": {
+        "listen": "0.0.0.0",
+        "port": 1090,
+        "protocol": "socks",
+        "settings": {
+            "auth": "noauth",
+            "udp": true,
+            "ip": "0.0.0.0"
+        }
+    },
+    "outbound": {
+        "protocol": "vmess",
+        "settings": {
+            "vnext": [
+                {
+                    "address": "abc.v2less.com",
+                    "port": 8900,
+                    "users": [
+                        {
+                            "id": "a0836f20-4154-28c1-c7c0-d49e7242b9f2"
+                        }
+                    ]
+                }
+            ]
+        },
+        "streamSettings": {
+            "network": "ws",
+            "security": "tls",
+            "tlsSettings": {
+                "allowlnsecure":true,
+                "serverName": "abc.v2less.com"
+            },
+            "wssettings":{
+                "connectionReuse":true,
+                "headers":{
+                    "Host": "abc.v2less.com"
+                }
+            }
+        }
+    },
+    "outboundDetour": [
+        {
+            "protocol": "freedom",
+            "settings": {},
+            "tag": "direct"
+        }
+    ],
+    "routing": {
+        "strategy": "rules",
+        "settings": {
+            "rules": [
+                {
+                    "type": "field",
+                    "port": "54-79",
+                    "outboundTag": "direct"
+                },
+                {
+                    "type": "field",
+                    "port": "81-442",
+                    "outboundTag": "direct"
+                },
+                {
+                    "type": "field",
+                    "port": "444-65535",
+                    "outboundTag": "direct"
+                },
+                {
+                    "type": "field",
+                    "domain": [
+                        "gc.kis.scr.kaspersky-labs.com"
+                    ],
+                    "outboundTag": "direct"
+                },
+                {
+                    "type": "chinasites",
+                    "outboundTag": "direct"
+                },
+                {
+                    "type": "field",
+                    "ip": [
+                        "0.0.0.0/8",
+                        "10.0.0.0/8",
+                        "100.64.0.0/10",
+                        "127.0.0.0/8",
+                        "169.254.0.0/16",
+                        "172.16.0.0/12",
+                        "192.0.0.0/24",
+                        "192.0.2.0/24",
+                        "192.168.0.0/16",
+                        "198.18.0.0/15",
+                        "198.51.100.0/24",
+                        "203.0.113.0/24",
+                        "::1/128",
+                        "fc00::/7",
+                        "fe80::/10"
+                    ],
+                    "outboundTag": "direct"
+                },
+                {
+                    "type": "chinaip",
+                    "outboundTag": "direct"
+                }
+            ]
+        }
+    }
+}

@@ -1,0 +1,106 @@
+#!/bin/bash
+luksusage() {
+	echo "
+00. First source $0
+01. genkeyfile       keyfile_path                     # 生成keyfile,默认~/keyfile
+02. luksfile         size(GB)      finename_with_path # 创建虚拟磁盘文件
+03. lukscreate       disk/filename                    # 创建加密磁盘
+04. luksaddkey       disk/filename keyfile            # 为加密磁盘添加keyfile
+05. luksopen         disk/filename keyfile            # 打开加密磁盘
+06. lukslist                                          # 列出已打开加密磁盘mapname
+07. luksstatus       mapname                          # 查看加密磁盘状态
+08. luksmkfs         mapname                          # 格式化文件系统ext4
+09. luksmount        mapname                          # 挂载加密磁盘
+10. luksclose        mapname                          # 卸载并关闭加密磁盘
+11. lukskeyslot      disk/filename                    # 查看某个加密盘的Key Slot
+12. lukskillkeyslot  disk/filename  slotnum           # 删除某个加密盘的Key Slot
+"
+}
+luksfile() {
+	size=${1:-1}
+	filename=${2:-$HOME/data}
+	fallocate -l "${size}"G "${filename}".vol
+}
+lukscreate() {
+	# 用 LUKS 方式加密（格式化）物理分区 或者 虚拟分区文件
+	disk=${1}
+	cryptsetup --cipher aes-xts-plain64 --key-size 512 --hash sha512 --iter-time 10000 luksFormat "$disk"
+}
+luksaddkey() {
+	# 给 LUKS 加密盘增加新的“Key Slot”
+	disk="$1"
+	keyfile="${2:-$HOME/keyfile}"
+	if [ -e "$keyfile" ] && [ -e "$disk" ]; then
+		cryptsetup luksAddKey "$disk" "$keyfile"
+	fi
+}
+lukskeyslot() {
+	# 查看某个 LUKS 加密盘的“Key Slot”
+	disk="$1"
+	cryptsetup luksDump "$disk"
+}
+lukskillkeyslot() {
+	# 删除某个 LUKS 加密盘的“Key Slot
+	disk="$1"
+	slotnum="$2"
+	cryptsetup luksDump "$disk"
+	cryptsetup luksKillSlot "$disk" "$slotnum"
+}
+
+luksmkfs() {
+	mapname=${1}
+	mkfs.ext4 /dev/mapper/"$mapname"
+}
+luksopen() {
+	# 打开 LUKS 加密盘
+	disk=${1}
+	mapname=$(basename "${disk%%.*}")
+	keyfile=${2}
+	if [ -e "$disk" ]; then
+		if [ -e "$keyfile" ]; then
+			cryptsetup --key-file "$keyfile" luksOpen "$disk" "$mapname"
+		else
+			cryptsetup luksOpen "$disk" "$mapname"
+		fi
+	fi
+}
+luksmount() {
+	mapname=${1}
+	mkdir -p /mnt/"$mapname"
+	mount /dev/mapper/"$mapname" /mnt/"$mapname"
+}
+
+lukslist() {
+	read -ra lists <<<"$(find /dev/mapper/* -maxdepth 1 -printf "%f ")"
+	echo "${lists[*]}"
+}
+luksstatus() {
+	mapname=${1}
+	cryptsetup status "$mapname"
+}
+luksclose() {
+	mapname=${1}
+	umount /dev/mapper/"$mapname"
+	cryptsetup close "$mapname"
+}
+
+genkeyfile() {
+	keyfile="${1:-$HOME/keyfile}"
+	dd if=/dev/urandom of="$keyfile" bs=1k count=64
+}
+
+if ! [ "$(id -u)" -eq 0 ]; then
+	echo "Please run $0 with root."
+	exit 0
+fi
+if [ "$(id -u)" -eq 0 ]; then
+	case $1 in
+	-h | --help | -H | --HELP)
+		luksusage
+		;;
+	*)
+		luksusage
+		;;
+
+	esac
+fi

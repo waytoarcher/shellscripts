@@ -1,0 +1,14 @@
+snippet head "head for my blog"
++++
+title = ${1:Title String} # 文章标题
+date = `!v strftime('%Y-%m-%dT%X%z')` # 自动添加日期信息
+draft = false # 设为false可被编译为HTML，true供本地修改
+tags = ["${8:Tag1}", "${9:Tag2}"] # 文章标签，可设置多个，用逗号隔开。Hugo会自动生成标签的子URL
++++
+$0
+endsnippet
+
+snippet copyright "paste mine name and email"
+# By Sandylaw <waytoarcher@gmail.com>
+# `!v strftime('%a, %d %b %Y %X %z')`
+endsnippet
